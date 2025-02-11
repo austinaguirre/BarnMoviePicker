@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Movie Picker",
-  description: "sdlkfjsdklfjds",
+  description: "Barn Movie Picker!",
 };
 
 // export default function RootLayout({
