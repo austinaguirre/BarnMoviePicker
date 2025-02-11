@@ -1,6 +1,7 @@
 // app/api/movies/route.ts
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { checkForBannedWords } from '@/lib/checkForBannedWords';
 
 export async function GET() {
   // Fetch all movies from DB
@@ -16,12 +17,25 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
   }
 
+  if (checkForBannedWords(title)) {
+    return NextResponse.json(
+      { error: "Your title contains inappropriate language." },
+      { status: 400 }
+    );
+  }
+  if (checkForBannedWords(genre)) {
+    return NextResponse.json(
+      { error: "Your genre contains inappropriate language." },
+      { status: 400 }
+    );
+  }
+
   const isWatched = watched === true;
 
   const query = 'INSERT INTO movies (title, genre, addedby, watched) VALUES ($1, $2, $3, $4) RETURNING *';
   const values = [title, genre, addedby, isWatched];
   const { rows } = await db.query(query, values);
-  
+
   return NextResponse.json(rows[0]);
 }
 

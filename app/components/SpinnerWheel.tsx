@@ -18,7 +18,16 @@ export default function SpinnerWheel({
   const [rotation, setRotation] = useState(0);
   const [transitionEnabled, setTransitionEnabled] = useState(true);
 
-  if (picks.length === 0) {
+  // 1) Build a "weightedArray" where each pick appears 'weight' times
+  const weightedArray: (typeof picks)[number][] = [];
+  picks.forEach((p) => {
+    for (let i = 0; i < p.weight; i++) {
+      weightedArray.push(p);
+    }
+  });
+
+  // If weightedArray is empty => no spinning
+  if (weightedArray.length === 0) {
     return (
       <div style={{ textAlign: "center" }}>
         <p>No picks to spin</p>
@@ -26,8 +35,8 @@ export default function SpinnerWheel({
     );
   }
 
-  // 1) Build conic gradient with either 2 colors (even) or 3 colors (odd)
-  const n = picks.length;
+  // 2) Build conic gradient based on weightedArray length
+  const n = weightedArray.length;
   const sliceAngle = 360 / n;
 
   let gradientSegments = "";
@@ -59,12 +68,23 @@ export default function SpinnerWheel({
     try {
       // Ask server for random pick
       const chosen = await onRandomPickServer();
-      const idx = picks.findIndex((p) => p.pickId === chosen.pickId);
-      if (idx < 0) {
-        console.warn("Chosen pick not found in picks array");
+
+      // const idx = picks.findIndex((p) => p.pickId === chosen.pickId);
+      // if (idx < 0) {
+      //   console.warn("Chosen pick not found in picks array");
+      //   setIsSpinning(false);
+      //   return;
+      // }
+      const indices = weightedArray
+        .map((wp, index) => (wp.pickId === chosen.pickId ? index : -1))
+        .filter((val) => val !== -1);
+
+      if (indices.length === 0) {
+        console.warn("Chosen pick not found in weighted array");
         setIsSpinning(false);
         return;
       }
+      const idx = indices[0];
 
       // For wedge i => midAngle
       const midAngle = sliceAngle * idx + sliceAngle / 2;
@@ -112,8 +132,8 @@ export default function SpinnerWheel({
           background: conicGradient,
         }}
       >
-        {/* wedge text */}
-        {picks.map((pick, i) => {
+        {/* wedge text for each item in weightedArray */}
+        {weightedArray.map((pick, i) => {
           const midAngle = sliceAngle * i + sliceAngle / 2;
           const maxChars = 8;
           const truncatedTitle =
@@ -123,7 +143,8 @@ export default function SpinnerWheel({
 
           return (
             <div
-              key={pick.pickId}
+              // key={pick.pickId}
+              key={`${pick.pickId}-${i}`}
               style={{
                 position: "absolute",
                 width: "250px",
@@ -170,7 +191,7 @@ export default function SpinnerWheel({
       <button
         style={styles.primaryButton}
         onClick={handleSpin}
-        disabled={isSpinning || picks.length === 0}
+        disabled={isSpinning || weightedArray.length === 0}
       >
         {isSpinning ? "Spinning..." : "Spin the Wheel"}
       </button>

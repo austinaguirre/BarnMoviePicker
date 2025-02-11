@@ -4,6 +4,7 @@
 export const dangerColor = "#71130F";
 export const primaryButtonColor = "#226284";
 export const secondaryButtonColor = "#444444";
+export const pickedColor = "#0c6b03";
 
 export const styles: { [key: string]: React.CSSProperties } = {
     // ====== DARK THEME STYLES ======
@@ -99,6 +100,15 @@ export const styles: { [key: string]: React.CSSProperties } = {
     },
     dangerSmallButton: {
         background: dangerColor,
+        color: "#fff",
+        border: "none",
+        borderRadius: "4px",
+        padding: "0.4rem 0.8rem",
+        fontSize: "0.85rem",
+        cursor: "pointer",
+    },
+    pickedSmallButton: {
+        background: pickedColor,
         color: "#fff",
         border: "none",
         borderRadius: "4px",

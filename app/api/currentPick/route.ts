@@ -53,9 +53,16 @@ export async function GET() {
  */
 export async function POST() {
   try {
-    // 1) Get all picks
+    // 1) Get picks with weight
     const picksQuery = `
-      SELECT tp.id AS pickId, m.id as movieId
+      SELECT 
+        tp.id AS "pickId", 
+        m.id AS "movieId",
+        (1 + COALESCE((
+          SELECT COUNT(*) 
+          FROM todays_picks_upvotes up 
+          WHERE up.pickId = tp.id
+        ),0)) AS "weight"
       FROM todays_picks tp
       JOIN movies m ON tp.movieId = m.id
     `;
@@ -68,14 +75,29 @@ export async function POST() {
       );
     }
 
-    // 2) Choose one randomly
-    const randomIndex = Math.floor(Math.random() * picks.length);
-    const randomPick = picks[randomIndex];
-    const chosenPickId = randomPick.pickid;
+    // 2) Build Weighted Array
+    //    e.g. if pickId=7 has weight=2, we push {pickId:7,movieId:...} twice.
+    const weightedArray: typeof picks[number][] = [];
+    picks.forEach((p) => {
+      const w = Number(p.weight);
+      for (let i = 0; i < w; i++) {
+        weightedArray.push(p);
+      }
+    });
 
-    // 3) Upsert into current_pick with id=1
-    //    We "replace" the current row with the new pickId.
-    //    In Postgres, we can do an ON CONFLICT for the primary key = 1.
+    if (weightedArray.length === 0) {
+      // In case all had weight=0, which shouldn't happen if there's at least 1 pick
+      return NextResponse.json(
+        { error: 'No weighted picks available to choose from.' },
+        { status: 400 }
+      );
+    }
+    // 3) Choose one item from the weighted array
+    const randomIndex = Math.floor(Math.random() * weightedArray.length);
+    const chosenPick = weightedArray[randomIndex];
+    const chosenPickId = chosenPick.pickId;
+
+    // 4) Upsert into current_pick with id=1
     const upsertQuery = `
       INSERT INTO current_pick (id, pickId, chosenAt)
       VALUES (1, $1, NOW())
@@ -83,17 +105,16 @@ export async function POST() {
       DO UPDATE SET pickId = EXCLUDED.pickId, chosenAt = EXCLUDED.chosenAt
       RETURNING *;
     `;
-    const upsertResult = await db.query(upsertQuery, [chosenPickId]);
+    await db.query(upsertQuery, [chosenPickId]);
 
-    // 4) Return the newly chosen pick's details
-    //    We can do a join or reuse the existing randomPick data. 
-    //    But let's do a final join to get the full movie details and chosenAt.
+    // 5) Return the newly chosen pick's details
+    //    We can do a final join to get the movie info
     const fetchQuery = `
       SELECT 
-        cp.id AS currentPickId, 
-        cp.chosenAt, 
-        tp.id AS pickId,
-        m.id AS movieId,
+        cp.id AS "currentPickId",
+        cp.chosenAt,
+        tp.id AS "pickId",
+        m.id AS "movieId",
         m.title,
         m.genre,
         m.addedBy
@@ -103,11 +124,14 @@ export async function POST() {
       WHERE cp.id = 1
     `;
     const { rows } = await db.query(fetchQuery);
+    if (rows.length === 0) {
+      return NextResponse.json({ error: 'Pick not found?' }, { status: 404 });
+    }
     const row = rows[0];
 
     return NextResponse.json({
-      pickId: row.pickid,
-      movieId: row.movieid,
+      pickId: row.pickId,
+      movieId: row.movieId,
       title: row.title,
       genre: row.genre,
       addedBy: row.addedby,

@@ -30,6 +30,9 @@ export default function Home() {
   const [signInError, setSignInError] = useState("");
   const [signUpError, setSignUpError] = useState("");
 
+  const userName = (session?.user as any)?.name;
+  const userHasPick = picks.some((p) => p.addedby === userName);
+
   useEffect(() => {
     if (status === "authenticated") {
       fetchMovies();
@@ -37,6 +40,9 @@ export default function Home() {
       fetchCurrentPick();
     }
   }, [status]);
+  // useEffect(() => {
+  //   console.log(userHasPick);
+  // }, [userHasPick]);
 
   const handleSignIn = async () => {
     const { username, password } = signInUser;
@@ -174,11 +180,16 @@ export default function Home() {
       addedby,
       watched,
     };
-    await fetch("/api/movies", {
+    let res = await fetch("/api/movies", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
+    if (!res.ok) {
+      const data = await res.json();
+      setGlobalError(data.error || "Failed to add movie.");
+      return;
+    }
     setNewMovie({ title: "", genre: "" });
     fetchMovies();
   }
@@ -324,6 +335,47 @@ export default function Home() {
     }
   };
 
+  // 2) define a handler to call the upvote API
+  async function handleUpvotePick(pickId: number) {
+    try {
+      // We'll pass the userName so server knows who is upvoting
+      const res = await fetch(`/api/picks/${pickId}/upvote`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: userName }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        setGlobalError(data.error || "Upvote failed.");
+        return;
+      }
+      // If success, re-fetch picks so we see updated weights
+      fetchPicks();
+    } catch (err) {
+      console.error("Upvote error:", err);
+      setGlobalError("Error upvoting pick.");
+    }
+  }
+  async function handleRemoveUpvote(pickId: number) {
+    try {
+      const res = await fetch(`/api/picks/${pickId}/upvote`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: userName }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        setGlobalError(data.error || "Failed to remove upvote.");
+        return;
+      }
+      // re-fetch picks
+      fetchPicks();
+    } catch (err) {
+      console.error("Remove upvote error:", err);
+      setGlobalError("Error removing upvote");
+    }
+  }
+
   // ====== RENDER ============================================================================
   if (status === "loading") {
     return <p style={styles.loading}>Loading session...</p>;
@@ -384,6 +436,10 @@ export default function Home() {
         currentPick={currentPick}
         handleRemovePick={handleRemovePick}
         handleClearAllPicks={handleClearAllPicks}
+        userHasPick={userHasPick}
+        onUpvotePick={handleUpvotePick}
+        userName={userName}
+        handleRemoveUpvote={handleRemoveUpvote}
       />
 
       <CurrentPickSection

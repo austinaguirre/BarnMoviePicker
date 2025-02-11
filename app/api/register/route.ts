@@ -2,10 +2,18 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 // import bcrypt from 'bcrypt'; // if you want real password hashing
+import { checkForBannedWords } from '@/lib/checkForBannedWords';
 
 export async function POST(request: Request) {
   try {
     const { username, password } = await request.json();
+
+    if (checkForBannedWords(username)){
+      return NextResponse.json(
+        { error: "Your username contains inappropriate language." },
+        { status: 400 }
+      );
+    }
 
     // Check if user already exists
     const checkQuery = 'SELECT id FROM users WHERE username = $1';

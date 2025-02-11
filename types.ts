@@ -14,6 +14,8 @@ export type Movie = {
     title: string;
     genre: string;
     addedby: string;
+    upvoters: string[];
+    pickedBy: any
   };
   
   export type CurrentPick = {

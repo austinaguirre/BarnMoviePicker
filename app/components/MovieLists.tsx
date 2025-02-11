@@ -107,7 +107,7 @@ export default function MovieLists(props: Props) {
               <div style={styles.itemActions}>
                 {!showWatched &&
                   (isOnTodaysPicks ? (
-                    <button disabled style={styles.primarySmallButton}>In Picks</button>
+                    <button disabled style={styles.pickedSmallButton}>In Picks</button>
                   ) : (
                     <button style={styles.primarySmallButton} onClick={() => onAddToPicks(movie.id)}>
                       Add to Picks

@@ -5,15 +5,19 @@ import { db } from '@/lib/db';
 export async function GET() {
   const query = `
     SELECT 
-      tp.id AS "pickId",      -- pick's own primary key
-      m.id AS "movieId",      -- the referenced movie's id
+      tp.id AS "pickId",
+      m.id AS "movieId",
       m.title,
       m.genre,
-      m.addedBy
+      m.addedBy,
+      tp.addedBy AS "pickedBy",
+      (1 + COALESCE((SELECT COUNT(*) FROM todays_picks_upvotes up WHERE up.pickId = tp.id), 0)) AS weight,
+      COALESCE(json_agg(u.userId) FILTER (WHERE u.userId IS NOT NULL), '[]') AS upvoters
     FROM todays_picks tp
     JOIN movies m ON tp.movieId = m.id
-  `;  
-  
+    LEFT JOIN todays_picks_upvotes u ON u.pickId = tp.id
+    GROUP BY tp.id, m.id, m.title, m.genre, m.addedBy
+  `;
   const { rows } = await db.query(query);
   return NextResponse.json(rows);
 }
@@ -64,6 +68,7 @@ export async function DELETE() {
   try {
     // We remove ALL rows in todays_picks
     await db.query('DELETE FROM todays_picks');
+    await db.query('delete from todays_picks_upvotes')
     return NextResponse.json({ message: 'All picks cleared' });
   } catch (error: any) {
     console.error('DELETE /api/picks (all) error:', error);
