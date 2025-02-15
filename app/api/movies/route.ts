@@ -5,7 +5,17 @@ import { checkForBannedWords } from '@/lib/checkForBannedWords';
 
 export async function GET() {
   // Fetch all movies from DB
-  const query = 'SELECT * FROM movies';
+  // Instead of SELECT *, do a JOIN to fetch username
+  const query = `
+    SELECT
+      m.id,
+      m.title,
+      m.genre,
+      u.username AS "addedby",
+      m.watched
+    FROM movies m
+    JOIN users u ON m.addedby = u.id
+  `;
   const { rows } = await db.query(query);
   return NextResponse.json(rows);
 }

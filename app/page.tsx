@@ -41,8 +41,9 @@ export default function Home() {
     }
   }, [status]);
   // useEffect(() => {
-  //   console.log(userHasPick);
-  // }, [userHasPick]);
+  //   console.log(session);
+  // }, [session]);
+
 
   const handleSignIn = async () => {
     const { username, password } = signInUser;
@@ -170,9 +171,7 @@ export default function Home() {
 
     // "addedby" from the session user
     const addedby =
-      (session.user as any)?.name ||
-      (session.user as any)?.email ||
-      "Anonymous";
+      (session.user as any)?.id || -1;
 
     const payload = {
       title: newMovie.title,
@@ -230,9 +229,7 @@ export default function Home() {
     }
 
     const userName =
-      (session.user as any)?.name ||
-      (session.user as any)?.email ||
-      "Anonymous";
+      (session.user as any)?.id || -1;
 
     const res = await fetch("/api/picks", {
       method: "POST",

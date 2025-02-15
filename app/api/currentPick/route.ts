@@ -16,10 +16,11 @@ export async function GET() {
         m.id AS "movieId",
         m.title,
         m.genre,
-        m.addedBy
+        u.username as "addedby"
         FROM current_pick cp
         JOIN todays_picks tp ON cp.pickId = tp.id
         JOIN movies m ON tp.movieId = m.id
+        join users u on m.addedby = u.id
         WHERE cp.id = 1
     `;
     const { rows } = await db.query(query);
@@ -36,7 +37,7 @@ export async function GET() {
       movieId: row.movieId,
       title: row.title,
       genre: row.genre,
-      addedBy: row.addedby,
+      addedby: row.addedby,
       chosenAt: row.chosenat,
     });
   } catch (error: any) {
@@ -117,10 +118,11 @@ export async function POST() {
         m.id AS "movieId",
         m.title,
         m.genre,
-        m.addedBy
+        u.username as "addedby"
       FROM current_pick cp
       JOIN todays_picks tp ON cp.pickId = tp.id
       JOIN movies m ON tp.movieId = m.id
+      join users u on m.addedby = u.id
       WHERE cp.id = 1
     `;
     const { rows } = await db.query(fetchQuery);
@@ -134,7 +136,7 @@ export async function POST() {
       movieId: row.movieId,
       title: row.title,
       genre: row.genre,
-      addedBy: row.addedby,
+      addedby: row.addedby,
       chosenAt: row.chosenat,
     });
   } catch (error: any) {

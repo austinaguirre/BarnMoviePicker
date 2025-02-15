@@ -9,14 +9,16 @@ export async function GET() {
       m.id AS "movieId",
       m.title,
       m.genre,
-      m.addedBy,
-      tp.addedBy AS "pickedBy",
+      um.username as "addedby",
+      upu.username as "pickedBy",
       (1 + COALESCE((SELECT COUNT(*) FROM todays_picks_upvotes up WHERE up.pickId = tp.id), 0)) AS weight,
       COALESCE(json_agg(u.userId) FILTER (WHERE u.userId IS NOT NULL), '[]') AS upvoters
     FROM todays_picks tp
     JOIN movies m ON tp.movieId = m.id
+    join users um on m.addedby = um.id
+    join users upu on tp.addedby = upu.id
     LEFT JOIN todays_picks_upvotes u ON u.pickId = tp.id
-    GROUP BY tp.id, m.id, m.title, m.genre, m.addedBy
+    GROUP BY tp.id, m.id, m.title, m.genre, um.id, upu.id
   `;
   const { rows } = await db.query(query);
   return NextResponse.json(rows);
