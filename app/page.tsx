@@ -26,24 +26,36 @@ export default function Home() {
   const [searchGenre, setSearchGenre] = useState("");
 
   const [signInUser, setSignInUser] = useState({ username: "", password: "" });
-  const [signUpUser, setSignUpUser] = useState({ username: "", password: "" });
+  const [signUpUser, setSignUpUser] = useState({
+    username: "",
+    password: "",
+    group: "",
+  });
   const [signInError, setSignInError] = useState("");
   const [signUpError, setSignUpError] = useState("");
 
   const userName = (session?.user as any)?.name;
+  const userGroup = (session?.user as any)?.groupId;
+  const userId = (session?.user as any)?.id;
   const userHasPick = picks.some((p) => p.addedby === userName);
+
+  const [groupName, setGroupName] = useState("");
 
   useEffect(() => {
     if (status === "authenticated") {
       fetchMovies();
       fetchPicks();
       fetchCurrentPick();
+      fetchGroupName();
     }
   }, [status]);
-  // useEffect(() => {
-  //   console.log(session);
-  // }, [session]);
 
+  useEffect(() => {
+    console.log(session);
+  }, [session]);
+  useEffect(() => {
+    console.log(groupName);
+  }, [groupName]);
 
   const handleSignIn = async () => {
     const { username, password } = signInUser;
@@ -71,10 +83,10 @@ export default function Home() {
   };
 
   const handleSignUp = async () => {
-    const { username, password } = signUpUser;
-    if (!username || !password) {
+    const { username, password, group } = signUpUser;
+    if (!username || !password || !group) {
       // CLEAR all
-      setSignUpUser({ username: "", password: "" });
+      setSignUpUser({ username: "", password: "", group: "" });
       setSignUpError("username and password required");
       return;
     }
@@ -83,20 +95,48 @@ export default function Home() {
       const res = await fetch("/api/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ username, password, group }),
       });
       const data = await res.json();
       if (res.ok) {
         setSignUpError("Signup was successful! You can now sign in.");
-        setSignUpUser({ username: "", password: "" });
+        setSignUpUser({ username: "", password: "", group: "" });
       } else {
-        setSignUpUser({ username: "", password: "" });
+        setSignUpUser({ username: "", password: "", group: "" });
         setSignUpError("Sign up failed: " + data.error);
       }
     } catch (err) {
       console.error(err);
       alert("Sign up error. -Server");
     }
+  };
+
+  async function onCreateGroup(groupName: string) {
+    try {
+      const res = await fetch("/api/groups", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: groupName }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+
+        setSignUpError("Create group failed: " + (data.error || "Unknown"));
+        return;
+      }
+      const data = await res.json();
+      setSignUpError(`${data.name} created`);
+    } catch (err) {
+      console.error(err);
+      setSignUpError("Create group error. -Server");
+    }
+  }
+
+  // Fetch the gropu name
+  const fetchGroupName = async () => {
+    const res = await fetch("/api/groups");
+    const data = await res.json();
+    setGroupName(data[0].name);
   };
 
   // Fetch the master list
@@ -115,6 +155,9 @@ export default function Home() {
 
   // Fetch the current pick
   const fetchCurrentPick = async () => {
+    // let groupId = (session as any)?.user.groupId
+    // const res = await fetch(`/api/currentPick?groupId=${groupId}`);
+
     const res = await fetch("/api/currentPick");
     const data = await res.json(); // either null or the CurrentPick
     setCurrentPick(data);
@@ -170,14 +213,16 @@ export default function Home() {
     }
 
     // "addedby" from the session user
-    const addedby =
-      (session.user as any)?.id || -1;
+    const addedby = (session.user as any)?.id || -1;
+
+    let groupId = (session as any)?.user.groupId;
 
     const payload = {
       title: newMovie.title,
       genre: newMovie.genre,
       addedby,
       watched,
+      groupId,
     };
     let res = await fetch("/api/movies", {
       method: "POST",
@@ -228,13 +273,13 @@ export default function Home() {
       return;
     }
 
-    const userName =
-      (session.user as any)?.id || -1;
+    const userName = (session.user as any)?.id || -1;
+    let groupId = (session as any)?.user.groupId;
 
     const res = await fetch("/api/picks", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ movieId, addedby: userName }),
+      body: JSON.stringify({ movieId, addedby: userName, groupid: groupId }),
     });
 
     if (!res.ok) {
@@ -339,7 +384,11 @@ export default function Home() {
       const res = await fetch(`/api/picks/${pickId}/upvote`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: userName }),
+        body: JSON.stringify({
+          userId: userId,
+          userName: userName,
+          userGroup: userGroup,
+        }),
       });
       if (!res.ok) {
         const data = await res.json();
@@ -358,7 +407,7 @@ export default function Home() {
       const res = await fetch(`/api/picks/${pickId}/upvote`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: userName }),
+        body: JSON.stringify({ userId: userId }),
       });
       if (!res.ok) {
         const data = await res.json();
@@ -389,6 +438,7 @@ export default function Home() {
         setSignUpUser={setSignUpUser}
         signInError={signInError}
         signUpError={signUpError}
+        onCreateGroup={onCreateGroup}
       />
     );
   }
@@ -398,7 +448,7 @@ export default function Home() {
     <div style={styles.container}>
       <h1 style={styles.title}>Barn Movie Picker</h1>
       <p style={styles.subtitle}>
-        You are signed in as <strong>{session?.user?.name}</strong>
+        You are signed in as <strong>{session?.user?.name} </strong>with group <strong>{groupName}</strong>
       </p>
       <button onClick={() => signOut()} style={styles.dangerButton}>
         Sign Out

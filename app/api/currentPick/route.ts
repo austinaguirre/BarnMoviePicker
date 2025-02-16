@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/lib/auth'; 
+
 /**
  * GET /api/currentPick
  * 
@@ -8,6 +11,18 @@ import { db } from '@/lib/db';
  */
 export async function GET() {
   try {
+
+    const session = await getServerSession(authOptions);
+    if (!session || !(session.user as any)?.groupId) { return NextResponse.json({ error: "Not logged in or no group." }, { status: 401 });}
+    const groupId = (session.user as any).groupId;
+    // const { searchParams } = new URL(request.url);
+    // const groupIdStr = searchParams.get('groupId');
+    // if (!groupIdStr) {
+    //   return NextResponse.json({ error: "Missing groupId" }, { status: 400 });
+    // }
+    // const groupId = parseInt(groupIdStr, 10);
+  
+
     const query = `
         SELECT 
         cp.id AS "currentPickId",
@@ -22,8 +37,9 @@ export async function GET() {
         JOIN movies m ON tp.movieId = m.id
         join users u on m.addedby = u.id
         WHERE cp.id = 1
+          AND cp.groupid = $1
     `;
-    const { rows } = await db.query(query);
+    const { rows } = await db.query(query, [groupId]);
 
     if (rows.length === 0) {
       // Nothing selected yet
@@ -54,6 +70,10 @@ export async function GET() {
  */
 export async function POST() {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session || !(session.user as any)?.groupId) { return NextResponse.json({ error: "Not logged in or no group." }, { status: 401 });}
+    const groupId = (session.user as any).groupId;
+
     // 1) Get picks with weight
     const picksQuery = `
       SELECT 
@@ -66,8 +86,9 @@ export async function POST() {
         ),0)) AS "weight"
       FROM todays_picks tp
       JOIN movies m ON tp.movieId = m.id
+      where tp.groupId = $1
     `;
-    const { rows: picks } = await db.query(picksQuery);
+    const { rows: picks } = await db.query(picksQuery, [groupId]);
 
     if (picks.length === 0) {
       return NextResponse.json(
@@ -100,13 +121,13 @@ export async function POST() {
 
     // 4) Upsert into current_pick with id=1
     const upsertQuery = `
-      INSERT INTO current_pick (id, pickId, chosenAt)
-      VALUES (1, $1, NOW())
+      INSERT INTO current_pick (id, pickId, chosenAt, groupId)
+      VALUES (1, $1, NOW(), $2)
       ON CONFLICT (id)
-      DO UPDATE SET pickId = EXCLUDED.pickId, chosenAt = EXCLUDED.chosenAt
+      DO UPDATE SET pickId = EXCLUDED.pickId, chosenAt = EXCLUDED.chosenAt, groupId = EXCLUDED.groupId
       RETURNING *;
     `;
-    await db.query(upsertQuery, [chosenPickId]);
+    await db.query(upsertQuery, [chosenPickId, groupId]);
 
     // 5) Return the newly chosen pick's details
     //    We can do a final join to get the movie info
@@ -123,9 +144,9 @@ export async function POST() {
       JOIN todays_picks tp ON cp.pickId = tp.id
       JOIN movies m ON tp.movieId = m.id
       join users u on m.addedby = u.id
-      WHERE cp.id = 1
+      WHERE cp.id = 1 and cp.groupId = $1
     `;
-    const { rows } = await db.query(fetchQuery);
+    const { rows } = await db.query(fetchQuery, [groupId]);
     if (rows.length === 0) {
       return NextResponse.json({ error: 'Pick not found?' }, { status: 404 });
     }
@@ -152,9 +173,13 @@ export async function POST() {
  */
 export async function DELETE() {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session || !(session.user as any)?.groupId) { return NextResponse.json({ error: "Not logged in or no group." }, { status: 401 });}
+    const groupId = (session.user as any).groupId;
+
     // If you strictly use id=1 row:
-    const query = `DELETE FROM current_pick WHERE id = 1`;
-    await db.query(query);
+    const query = `DELETE FROM current_pick WHERE groupId = $1`;
+    await db.query(query, [groupId]);
     return NextResponse.json({ message: 'Current pick cleared.' });
   } catch (error: any) {
     console.error('DELETE /currentPick error:', error);

@@ -2,35 +2,54 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/lib/auth';
+
 export async function GET() {
+  const session = await getServerSession(authOptions);
+  if (!session || !(session.user as any)?.groupId) { return NextResponse.json({ error: "Not logged in or no group." }, { status: 401 }); }
+  const rawGroupId = (session.user as any).groupId; // e.g. "3"
+  const groupId = parseInt(rawGroupId, 10);
   const query = `
-    SELECT 
-      tp.id AS "pickId",
-      m.id AS "movieId",
-      m.title,
-      m.genre,
-      um.username as "addedby",
-      upu.username as "pickedBy",
-      (1 + COALESCE((SELECT COUNT(*) FROM todays_picks_upvotes up WHERE up.pickId = tp.id), 0)) AS weight,
-      COALESCE(json_agg(u.userId) FILTER (WHERE u.userId IS NOT NULL), '[]') AS upvoters
-    FROM todays_picks tp
-    JOIN movies m ON tp.movieId = m.id
-    join users um on m.addedby = um.id
-    join users upu on tp.addedby = upu.id
-    LEFT JOIN todays_picks_upvotes u ON u.pickId = tp.id
-    GROUP BY tp.id, m.id, m.title, m.genre, um.id, upu.id
+SELECT 
+    tp.id AS "pickId",
+    m.id AS "movieId",
+    m.title,
+    m.genre,
+    um.username as "addedby",
+    upu.username as "pickedBy",
+
+    (1 + COALESCE(
+      (SELECT COUNT(*) FROM todays_picks_upvotes up2 WHERE up2.pickId = tp.id),
+      0
+    )) AS weight,
+
+    COALESCE(
+      JSON_AGG(uu.username) FILTER (WHERE uu.username IS NOT NULL),
+      '[]'
+    ) AS upvoters
+
+  FROM todays_picks tp
+  JOIN movies m ON tp.movieId = m.id
+  JOIN users um ON m.addedby = um.id
+  JOIN users upu ON tp.addedby = upu.id
+  LEFT JOIN todays_picks_upvotes up ON up.pickId = tp.id
+  LEFT JOIN users uu ON up.userId = uu.id
+  WHERE tp.groupid = $1
+  GROUP BY tp.id, m.id, um.id, upu.id
+
   `;
-  const { rows } = await db.query(query);
+  const { rows } = await db.query(query, [groupId]);
   return NextResponse.json(rows);
 }
 
 export async function POST(request: Request) {
   try {
-    const { movieId, addedby } = await request.json();
+    const { movieId, addedby, groupid } = await request.json();
 
-    if (!movieId || !addedby) {
+    if (!movieId || !addedby || !groupid) {
       return NextResponse.json(
-        { error: 'movieId and addedby are required' },
+        { error: 'movieId and addedby and groupid are required' },
         { status: 400 }
       );
     }
@@ -50,11 +69,11 @@ export async function POST(request: Request) {
 
     // 2) Insert the new pick (with addedby)
     const insertQuery = `
-      INSERT INTO todays_picks (movieId, addedby)
-      VALUES ($1, $2)
+      INSERT INTO todays_picks (movieId, addedby, groupid)
+      VALUES ($1, $2, $3)
       RETURNING *
     `;
-    const insertResult = await db.query(insertQuery, [movieId, addedby]);
+    const insertResult = await db.query(insertQuery, [movieId, addedby, groupid]);
     const newPick = insertResult.rows[0];
 
     // 3) Optionally join with movie details or just return newPick
@@ -67,10 +86,14 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE() {
+  const session = await getServerSession(authOptions);
+  if (!session || !(session.user as any)?.groupId) { return NextResponse.json({ error: "Not logged in or no group." }, { status: 401 }); }
+  const groupId = (session.user as any).groupId;
+
   try {
     // We remove ALL rows in todays_picks
-    await db.query('DELETE FROM todays_picks');
-    await db.query('delete from todays_picks_upvotes')
+    await db.query('DELETE FROM todays_picks where groupid = $1', [groupId]);
+    await db.query('delete from todays_picks_upvotes where groupid = $1', [groupId])
     return NextResponse.json({ message: 'All picks cleared' });
   } catch (error: any) {
     console.error('DELETE /api/picks (all) error:', error);

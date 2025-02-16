@@ -5,7 +5,7 @@ import { db } from '@/lib/db';
 export async function POST(request: NextRequest) {
   try {
     // 1) read user from body (or from session)
-    const { userId } = await request.json();
+    const { userId, userName, userGroup } = await request.json();
 
     // 2) Parse pickId from the last URL segment
     // e.g. /api/picks/7/upvote => lastSegment is "upvote"
@@ -46,8 +46,8 @@ export async function POST(request: NextRequest) {
 
     // 4) Insert row in todays_picks_upvotes
     const insertRes = await db.query(
-      `INSERT INTO todays_picks_upvotes (pickId, userId) VALUES ($1, $2) RETURNING *`,
-      [pickIdNum, userId]
+      `INSERT INTO todays_picks_upvotes (pickId, userId, groupid) VALUES ($1, $2, $3) RETURNING *`,
+      [pickIdNum, userId, userGroup]
     );
     const upvoteRow = insertRes.rows[0];
 

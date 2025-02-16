@@ -44,6 +44,7 @@ export const authOptions: NextAuthOptions = {
         return {
           id: user.id,
           name: user.username,
+          groupId: user.groupid
         };
       },
     }),
