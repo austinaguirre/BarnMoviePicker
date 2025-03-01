@@ -136,6 +136,11 @@ export default function Home() {
   const fetchGroupName = async () => {
     const res = await fetch("/api/groups");
     const data = await res.json();
+    if (res.status === 401) {
+      signOut();
+      setGroupName("")
+      return;
+    }
     setGroupName(data[0].name);
   };
 
@@ -143,6 +148,11 @@ export default function Home() {
   const fetchMovies = async () => {
     const res = await fetch("/api/movies");
     const data = await res.json();
+    if (res.status === 401) {
+      signOut();
+      setMovies([])
+      return;
+    }
     setMovies(data);
   };
 
@@ -150,6 +160,11 @@ export default function Home() {
   const fetchPicks = async () => {
     const res = await fetch("/api/picks");
     const data = await res.json();
+    if (res.status === 401) {
+      signOut();
+      setPicks([])
+      return;
+    }
     setPicks(data);
   };
 
@@ -160,6 +175,11 @@ export default function Home() {
 
     const res = await fetch("/api/currentPick");
     const data = await res.json(); // either null or the CurrentPick
+    if (res.status === 401) {
+      signOut();
+      setCurrentPick(null)
+      return;
+    }
     setCurrentPick(data);
   };
 
@@ -448,7 +468,8 @@ export default function Home() {
     <div style={styles.container}>
       <h1 style={styles.title}>Barn Movie Picker</h1>
       <p style={styles.subtitle}>
-        You are signed in as <strong>{session?.user?.name} </strong>with group <strong>{groupName}</strong>
+        You are signed in as <strong>{session?.user?.name} </strong>with group{" "}
+        <strong>{groupName}</strong>
       </p>
       <button onClick={() => signOut()} style={styles.dangerButton}>
         Sign Out
